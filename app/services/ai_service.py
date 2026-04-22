@@ -12,7 +12,7 @@ settings = get_settings()
 class AIService:
     def __init__(self):
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        self.model_name = 'gemini-2.5-flash'
+        self.model_name = 'gemini-1.5-flash'
 
     async def parse_receipt(self, file_path: str) -> dict:
         """
@@ -109,6 +109,7 @@ class AIService:
             3. Return ONLY the JSON object.
             """
             
+            print(f"DEBUG AI PROMPT: {prompt}")
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=[prompt],
@@ -118,6 +119,7 @@ class AIService:
             )
             
             raw_text = response.text.strip()
+            print(f"DEBUG AI RAW RESPONSE: {raw_text}")
             data_dict = json.loads(raw_text)
             
             receipt_data = ReceiptData(**data_dict)
@@ -128,6 +130,8 @@ class AIService:
             return receipt_data.model_dump(by_alias=True)
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"Error in AIService.parse_transaction_text: {str(e)}")
             return {
                 "amount": None,
