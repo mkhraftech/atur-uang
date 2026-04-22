@@ -12,7 +12,7 @@ settings = get_settings()
 class AIService:
     def __init__(self):
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        self.model_name = 'gemini-1.5-flash'
+        self.model_name = 'gemini-2.5-flash'
 
     async def parse_receipt(self, file_path: str) -> dict:
         """
