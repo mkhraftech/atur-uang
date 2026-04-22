@@ -129,6 +129,46 @@ class AIService:
             
             return receipt_data.model_dump(by_alias=True)
             
+        except genai.errors.ServerError as e:
+            prompt = f"""
+            Extract transaction details from this text accurately into a JSON format.
+            Text: "{text}"
+            
+            Focus on Indonesian context and currency (e.g., 'rb' means '000').
+            
+            Output MUST be a valid JSON with these fields:
+            - amount: (number) The total amount spent or received.
+            - date: (string, YYYY-MM-DD) The date of the transaction. Default to today ({datetime.now().date()}).
+            - merchant: (string) The name of the store or person involved.
+            - description: (string) A short summary of the transaction.
+            - category_suggestion: (string) Choose ONE that fits best from: 'Wajib', 'Harian', 'Jajan', 'Transport', 'Impulsif'. Default to 'Jajan' if unsure.
+            - currency: (string) Default to 'IDR'.
+
+            Rules:
+            1. If it sounds like an income, mark it as such in the description but provide the amount as positive.
+            2. For amounts like '50rb', '50k', parse as 50000.
+            3. Return ONLY the JSON object.
+            """
+            
+            print(f"DEBUG AI PROMPT: {prompt}")
+            response = self.client.models.generate_content(
+                model='gemini-2.5-flash-lite',
+                contents=[prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                )
+            )
+            
+            raw_text = response.text.strip()
+            print(f"DEBUG AI RAW RESPONSE: {raw_text}")
+            data_dict = json.loads(raw_text)
+            
+            receipt_data = ReceiptData(**data_dict)
+            
+            if not receipt_data.transaction_date:
+                receipt_data.transaction_date = datetime.now().date()
+            
+            return receipt_data.model_dump(by_alias=True)
         except Exception as e:
             import traceback
             traceback.print_exc()
