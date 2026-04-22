@@ -8,7 +8,7 @@ from app.services.receipt_service import process_receipt_from_path
 from app.core.config import get_settings
 
 USER_MAP = {
-    # "628123456789": "550e8400-e29b-41d4-a716-446655440000",
+    "6281938902460": "550e8400-e29b-41d4-a716-446655440000",
     "6287798705864": "550e8400-e29b-41d4-a716-446655440000"
 }
 
