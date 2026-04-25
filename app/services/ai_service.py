@@ -183,23 +183,28 @@ class AIService:
     async def parse_todo_reminder(self, text: str) -> dict:
         """
         Parse pesan todo/reminder dari teks natural.
-        Return: { "todo_text": str, "remind_at": "YYYY-MM-DDTHH:MM:SS" | null }
+        Return: { "todo_text": str, "remind_at": "YYYY-MM-DDTHH:MM:SS+07:00" | null }
         """
         try:
+            from datetime import timezone, timedelta
+            wib = timezone(timedelta(hours=7))
+            now_wib = datetime.now(wib)
+
             prompt = f"""
             Ekstrak informasi todo/reminder dari teks berikut dalam konteks Bahasa Indonesia.
             Teks: "{text}"
-            Waktu sekarang: {datetime.now().strftime("%Y-%m-%d %H:%M")} (WIB, UTC+7)
+            Waktu sekarang: {now_wib.strftime("%Y-%m-%d %H:%M")} (WIB, UTC+7)
 
             Output MUST be valid JSON with:
             - todo_text: (string) isi todo/pengingat yang singkat dan jelas
-            - remind_at: (string | null) waktu reminder dalam format ISO 8601 UTC (YYYY-MM-DDTHH:MM:SS+07:00).
+            - remind_at: (string | null) waktu reminder dalam format ISO 8601 dengan offset +07:00 (contoh: 2025-04-26T09:00:00+07:00).
+              PENTING: Gunakan tahun {now_wib.year} jika tidak disebutkan.
               Null jika tidak ada waktu yang disebutkan.
 
             Contoh:
-            - "ingatkan besok jam 9 pagi untuk rapat" → remind_at: besok 09:00 WIB
-            - "todo: beli susu"                       → remind_at: null
-            - "remind me in 2 hours buat minum obat"  → remind_at: 2 jam dari sekarang WIB
+            - "ingatkan besok jam 9 pagi" → remind_at: (besok)T09:00:00+07:00
+            - "todo: beli susu"           → remind_at: null
+            - "remind me in 2 hours"      → remind_at: (sekarang + 2 jam)T(HH:MM:SS)+07:00
 
             Return ONLY the JSON object.
             """
