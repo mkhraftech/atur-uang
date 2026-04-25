@@ -5,6 +5,7 @@ description = "ini adalah aplikasi untuk mencatat pengeluaran"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "apscheduler>=3.11.2",
     "fastapi>=0.135.3",
     "google-genai>=0.1.0",
     "pillow>=12.2.0",

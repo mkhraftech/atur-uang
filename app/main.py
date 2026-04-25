@@ -9,6 +9,8 @@ from app.api.routes.category import router as category_router
 from app.api.routes.whatsapp import router as whatsapp_router
 from app.api.routes.receipt import router as receipt_router
 from app.core.database import Base, engine
+from app.models import todo  # noqa: F401 — register Todo table
+from app.core.scheduler import start_scheduler, stop_scheduler
 
 settings = get_settings()
 
@@ -25,6 +27,12 @@ def startup_event():
         logger.info("Database connected")
     except Exception as e:
         logger.error(e)
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    stop_scheduler()
 
 app.include_router(transaction_router)
 app.include_router(insight_router)

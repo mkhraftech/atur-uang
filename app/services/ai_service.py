@@ -180,4 +180,43 @@ class AIService:
                 "currency": "IDR"
             }
 
+    async def parse_todo_reminder(self, text: str) -> dict:
+        """
+        Parse pesan todo/reminder dari teks natural.
+        Return: { "todo_text": str, "remind_at": "YYYY-MM-DDTHH:MM:SS" | null }
+        """
+        try:
+            prompt = f"""
+            Ekstrak informasi todo/reminder dari teks berikut dalam konteks Bahasa Indonesia.
+            Teks: "{text}"
+            Waktu sekarang: {datetime.now().strftime("%Y-%m-%d %H:%M")} (WIB, UTC+7)
+
+            Output MUST be valid JSON with:
+            - todo_text: (string) isi todo/pengingat yang singkat dan jelas
+            - remind_at: (string | null) waktu reminder dalam format ISO 8601 UTC (YYYY-MM-DDTHH:MM:SS+07:00).
+              Null jika tidak ada waktu yang disebutkan.
+
+            Contoh:
+            - "ingatkan besok jam 9 pagi untuk rapat" → remind_at: besok 09:00 WIB
+            - "todo: beli susu"                       → remind_at: null
+            - "remind me in 2 hours buat minum obat"  → remind_at: 2 jam dari sekarang WIB
+
+            Return ONLY the JSON object.
+            """
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                )
+            )
+            data = json.loads(response.text.strip())
+            logger.debug(f"parse_todo_reminder result: {data}")
+            return data
+        except Exception as e:
+            logger.exception(f"Error in parse_todo_reminder: {e}")
+            # Fallback: anggap todo biasa tanpa reminder
+            return {"todo_text": text, "remind_at": None}
+
+
 ai_service = AIService()

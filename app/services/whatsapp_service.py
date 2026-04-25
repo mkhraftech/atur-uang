@@ -1,12 +1,15 @@
 import requests
 import os
+import re
 
 from app.services.transaction_service import TransactionService
 from app.services.categorization_service import CategorizationService
 from app.services.ai_service import ai_service
 from app.services.receipt_service import process_receipt_from_path
+from app.services.todo_service import TodoService
 from app.core.config import get_settings
 from app.core.logger import logger
+from app.core.database import SessionLocal
 
 USER_MAP = {
     "6281938902460": "550e8400-e29b-41d4-a716-446655440000",
@@ -22,7 +25,7 @@ async def handle_message(text: str, phone: str):
     if not user_id:
         return "User belum terdaftar"
 
-    text_lower = text.lower()
+    text_lower = text.lower().strip()
 
     # 📊 SUMMARY
     if text_lower == "summary":
@@ -32,10 +35,34 @@ async def handle_message(text: str, phone: str):
     if text_lower == "hari ini":
         return await handle_today(user_id)
 
+    # 📋 LIST TODO
+    if text_lower in ("list todo", "todo list", "daftar todo"):
+        db = SessionLocal()
+        return TodoService.list_todos(db, user_id)
+
+    # ✅ SELESAI <nomor>
+    match_done = re.match(r"^(selesai|done)\s+(\d+)$", text_lower)
+    if match_done:
+        db = SessionLocal()
+        return TodoService.complete_todo(db, user_id, int(match_done.group(2)))
+
+    # 🗑️ HAPUS <nomor>
+    match_del = re.match(r"^(hapus|delete|del)\s+(\d+)$", text_lower)
+    if match_del:
+        db = SessionLocal()
+        return TodoService.delete_todo(db, user_id, int(match_del.group(2)))
+
+    # ➕ TODO / REMINDER (natural language)
+    is_todo = text_lower.startswith("todo:") or text_lower.startswith("todo ")
+    is_reminder = any(text_lower.startswith(kw) for kw in (
+        "ingatkan", "remind", "reminder", "pengingat"
+    ))
+    if is_todo or is_reminder:
+        return await handle_todo_reminder(text, user_id, phone)
+
     # ➕ INPUT TRANSACTION
     return await handle_transaction_input(text, user_id)
 
-import re
 
 
 def parse_transaction(text: str):
@@ -51,7 +78,6 @@ def parse_transaction(text: str):
     return description, amount
 
 from datetime import date
-from app.core.database import SessionLocal
 from app.schemas.transaction import TransactionCreate
 
 
@@ -191,3 +217,23 @@ async def handle_today(user_id):
     today = daily[-1]
 
     return f"📅 Hari ini: {today['total']}"
+
+
+async def handle_todo_reminder(text: str, user_id: str, phone: str) -> str:
+    """Parse teks todo/reminder dengan AI, simpan ke DB."""
+    db = SessionLocal()
+    parsed = await ai_service.parse_todo_reminder(text)
+
+    todo_text = parsed.get("todo_text") or text
+    remind_at_str = parsed.get("remind_at")
+
+    if remind_at_str:
+        from datetime import datetime
+        try:
+            # Parse ISO 8601 dengan timezone
+            remind_at = datetime.fromisoformat(remind_at_str)
+            return TodoService.add_reminder(db, user_id, phone, todo_text, remind_at)
+        except Exception:
+            logger.warning(f"Gagal parse remind_at: {remind_at_str}, simpan sebagai todo biasa")
+
+    return TodoService.add_todo(db, user_id, phone, todo_text)
