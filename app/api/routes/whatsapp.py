@@ -1,8 +1,6 @@
 from app.services.whatsapp_service import handle_message, handle_image_message
 from app.services.whatsapp_service import send_whatsapp_message
-from fastapi import APIRouter, Request
-import requests
-import os
+from fastapi import APIRouter, BackgroundTasks, Request
 from app.core.config import get_settings
 from app.core.logger import logger
 
@@ -26,15 +24,37 @@ def verify_webhook(request: Request):
     return {"error": "Verification failed"}
 
 
+# ─── Background task wrappers ───────────────────────────────────────────────
+
+async def _process_text(text: str, phone: str):
+    """Dijalankan di background: parse teks via AI lalu kirim balasan."""
+    try:
+        result = await handle_message(text, phone)
+        send_whatsapp_message(phone, result)
+    except Exception as e:
+        logger.exception(f"Background task error (text): {e}")
+        send_whatsapp_message(phone, "❌ Terjadi kesalahan saat memproses pesan.")
+
+
+async def _process_image(media_id: str, phone: str):
+    """Dijalankan di background: download + parse foto struk lalu kirim balasan."""
+    try:
+        result = await handle_image_message(media_id, phone)
+        send_whatsapp_message(phone, result)
+    except Exception as e:
+        logger.exception(f"Background task error (image): {e}")
+        send_whatsapp_message(phone, "❌ Terjadi kesalahan saat memproses foto struk.")
+
+
 # 📩 RECEIVE MESSAGE
 @router.post("/webhook/whatsapp")
-async def receive_message(request: Request):
+async def receive_message(request: Request, background_tasks: BackgroundTasks):
     body = await request.json()
 
     try:
-        # Meta mengirim 'messages' untuk pesan baru, dan 'statuses' untuk update status (sent, delivered, read)
+        # Meta mengirim 'messages' untuk pesan baru, 'statuses' untuk update status
         value = body["entry"][0]["changes"][0]["value"]
-        
+
         if "messages" in value:
             message = value["messages"][0]
             phone = message["from"]
@@ -42,14 +62,20 @@ async def receive_message(request: Request):
 
             if msg_type == "text":
                 text = message["text"]["body"]
-                response_text = await handle_message(text, phone)
+                # Balas segera agar WhatsApp tidak timeout, proses di background
+                send_whatsapp_message(phone, "⏳ Sedang diproses...")
+                background_tasks.add_task(_process_text, text, phone)
+
             elif msg_type == "image":
                 media_id = message["image"]["id"]
-                response_text = await handle_image_message(media_id, phone)
-            else:
-                response_text = "Maaf, saya hanya bisa memproses pesan teks atau foto struk."
+                send_whatsapp_message(phone, "⏳ Sedang memproses foto struk Anda...")
+                background_tasks.add_task(_process_image, media_id, phone)
 
-            send_whatsapp_message(phone, response_text)
+            else:
+                send_whatsapp_message(
+                    phone,
+                    "Maaf, saya hanya bisa memproses pesan teks atau foto struk."
+                )
 
     except Exception as e:
         logger.exception(f"Error handling WhatsApp webhook: {e}")
