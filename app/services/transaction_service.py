@@ -6,6 +6,7 @@ from app.models.transaction_category import TransactionCategory
 from app.models.category import Category
 from app.repositories.transaction_repository import TransactionRepository
 import uuid
+from app.core.logger import logger
 
 
 class TransactionService:
@@ -211,8 +212,8 @@ class TransactionService:
         categories = TransactionService.get_by_category(db, user_id)
         summary = TransactionService.get_summary(db, user_id)
 
-        print(categories,'categories')
-        print(summary, 'summary')
+        logger.debug(f"Categories: {categories}")
+        logger.debug(f"Summary: {summary}")
 
         total_expense = summary["total_expense"]
 

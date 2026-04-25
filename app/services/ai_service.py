@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 from app.core.config import get_settings
 from app.schemas.ai import ReceiptData
+from app.core.logger import logger
 
 settings = get_settings()
 
@@ -67,8 +68,7 @@ class AIService:
             return receipt_data.model_dump(by_alias=True)
             
         except Exception as e:
-
-            print(f"Error in AIService.parse_receipt: {str(e)}")
+            logger.error(f"Error in AIService.parse_receipt: {str(e)}", exc_info=True)
             # Return a basic fallback if AI fails
             return {
                 "amount": None,
@@ -109,7 +109,7 @@ class AIService:
             3. Return ONLY the JSON object.
             """
             
-            print(f"DEBUG AI PROMPT: {prompt}")
+            logger.debug(f"AI PROMPT: {prompt}")
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=[prompt],
@@ -119,7 +119,7 @@ class AIService:
             )
             
             raw_text = response.text.strip()
-            print(f"DEBUG AI RAW RESPONSE: {raw_text}")
+            logger.debug(f"AI RAW RESPONSE: {raw_text}")
             data_dict = json.loads(raw_text)
             
             receipt_data = ReceiptData(**data_dict)
@@ -150,7 +150,7 @@ class AIService:
             3. Return ONLY the JSON object.
             """
             
-            print(f"DEBUG AI PROMPT: {prompt}")
+            logger.debug(f"AI PROMPT: {prompt}")
             response = self.client.models.generate_content(
                 model='gemini-2.5-flash-lite',
                 contents=[prompt],
@@ -160,7 +160,7 @@ class AIService:
             )
             
             raw_text = response.text.strip()
-            print(f"DEBUG AI RAW RESPONSE: {raw_text}")
+            logger.debug(f"AI RAW RESPONSE: {raw_text}")
             data_dict = json.loads(raw_text)
             
             receipt_data = ReceiptData(**data_dict)
@@ -170,9 +170,7 @@ class AIService:
             
             return receipt_data.model_dump(by_alias=True)
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            print(f"Error in AIService.parse_transaction_text: {str(e)}")
+            logger.exception(f"Error in AIService.parse_transaction_text: {str(e)}")
             return {
                 "amount": None,
                 "date": str(datetime.now().date()),

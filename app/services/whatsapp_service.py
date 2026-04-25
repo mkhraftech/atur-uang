@@ -6,6 +6,7 @@ from app.services.categorization_service import CategorizationService
 from app.services.ai_service import ai_service
 from app.services.receipt_service import process_receipt_from_path
 from app.core.config import get_settings
+from app.core.logger import logger
 
 USER_MAP = {
     "6281938902460": "550e8400-e29b-41d4-a716-446655440000",
@@ -118,7 +119,7 @@ def send_whatsapp_message(to, text):
     }
 
     response = requests.post(url, headers=headers, json=payload)
-    print(f"DEBUG WHATSAPP RESPONSE: {response.status_code} - {response.text}")
+    logger.debug(f"WHATSAPP RESPONSE: {response.status_code} - {response.text}")
     return response.json()
 
 async def download_whatsapp_media(media_id):
@@ -128,7 +129,7 @@ async def download_whatsapp_media(media_id):
     
     res = requests.get(url, headers=headers)
     if res.status_code != 200:
-        print(f"Error fetching media URL: {res.text}")
+        logger.error(f"Error fetching media URL: {res.text}")
         return None
         
     media_url = res.json().get("url")
@@ -138,7 +139,7 @@ async def download_whatsapp_media(media_id):
     # 2. Download the binary data
     res_bin = requests.get(media_url, headers=headers)
     if res_bin.status_code != 200:
-        print(f"Error downloading media: {res_bin.text}")
+        logger.error(f"Error downloading media: {res_bin.text}")
         return None
 
     # 3. Save to uploads/

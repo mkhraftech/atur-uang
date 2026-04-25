@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.category_rule import CategoryRule
 from app.models.user_category_history import UserCategoryHistory
+from app.core.logger import logger
 
 class CategorizationService:
 
@@ -61,7 +62,7 @@ class CategorizationService:
                 return category.id
 
         # 4️⃣ FALLBACK
-        print("No category found")
+        logger.warning(f"No category found for description: {description}")
         return None
 
     # 🧠 LEARNING (SAVE / UPDATE HISTORY)

@@ -1,7 +1,7 @@
 [project]
 name = "atur-uang"
 version = "0.1.0"
-description = "Add your description here"
+description = "ini adalah aplikasi untuk mencatat pengeluaran"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

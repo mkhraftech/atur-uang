@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request
 import requests
 import os
 from app.core.config import get_settings
+from app.core.logger import logger
 
 settings = get_settings()
 
@@ -51,6 +52,6 @@ async def receive_message(request: Request):
             send_whatsapp_message(phone, response_text)
 
     except Exception as e:
-        print("Error:", e)
+        logger.exception(f"Error handling WhatsApp webhook: {e}")
 
     return {"status": "ok"}
