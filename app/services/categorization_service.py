@@ -47,8 +47,8 @@ class CategorizationService:
                 "shopping": "Impulsif",
                 "transport": "Transport",
                 "bills": "Wajib",
-                "health": "Harian",
-                "groceries": "Harian"
+                "health": "Kebutuhan Pokok",
+                "groceries": "Kebutuhan Pokok"
             }
             
             target_name = mapping.get(suggestion, ai_suggestion)
