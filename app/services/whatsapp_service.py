@@ -1,6 +1,9 @@
 import requests
 import os
 import re
+import uuid
+from datetime import datetime, date
+from zoneinfo import ZoneInfo
 
 from app.services.transaction_service import TransactionService
 from app.services.categorization_service import CategorizationService
@@ -10,10 +13,8 @@ from app.services.todo_service import TodoService
 from app.core.config import get_settings
 from app.core.logger import logger
 from app.core.database import SessionLocal
-
 from app.repositories.user_repository import UserRepository
-from zoneinfo import ZoneInfo
-from datetime import datetime
+from app.schemas.transaction import TransactionCreate
 
 settings = get_settings()
 
@@ -125,8 +126,7 @@ def parse_transaction(text: str):
 
     return description, amount
 
-from datetime import date
-from app.schemas.transaction import TransactionCreate
+
 
 
 async def handle_transaction_input(text, user_id, user_now):

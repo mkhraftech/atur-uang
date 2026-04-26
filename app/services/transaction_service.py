@@ -1,13 +1,13 @@
 from app.services.categorization_service import CategorizationService
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, Date
 from app.models.transaction import Transaction
 from app.models.transaction_category import TransactionCategory
 from app.models.category import Category
 from app.repositories.transaction_repository import TransactionRepository
 import uuid
 from app.core.logger import logger
-from datetime import date
+
 
 
 class TransactionService:
@@ -177,7 +177,7 @@ class TransactionService:
         # PostgreSQL syntax: transaction_date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta'
         local_date = func.cast(
             func.timezone(tz_name, func.timezone('UTC', Transaction.transaction_date)),
-            date
+            Date()
         )
 
         result = db.query(
