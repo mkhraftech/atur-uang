@@ -11,19 +11,27 @@ from app.core.config import get_settings
 from app.core.logger import logger
 from app.core.database import SessionLocal
 
-USER_MAP = {
-    "6281938902460": "550e8400-e29b-41d4-a716-446655440000",
-    "6287798705864": "550e8400-e29b-41d4-a716-446655440000"
-}
+from app.repositories.user_repository import UserRepository
 
 settings = get_settings()
 
 
 async def handle_message(text: str, phone: str):
-    user_id = USER_MAP.get(phone)
+    db = SessionLocal()
+    user = UserRepository.get_by_phone(db, phone)
 
-    if not user_id:
-        return "User belum terdaftar"
+    if not user:
+        login_url = f"{settings.BASE_URL}/api/v1/auth/login?phone={phone}"
+        return (
+            f"👋 *Selamat datang di Atur Uang!*\n\n"
+            f"Sepertinya nomor Anda belum terdaftar. Untuk mulai menggunakan asisten keuangan ini, "
+            f"silakan hubungkan akun Google Anda melalui link di bawah ini:\n\n"
+            f"🔗 {login_url}\n\n"
+            f"Setelah berhasil, Anda bisa langsung mencatat pengeluaran di sini! 😊"
+        )
+
+    user_id = user.id
+
 
     text_lower = text.lower().strip()
 
@@ -94,11 +102,13 @@ async def handle_transaction_input(text, user_id):
     if not amount:
         return "Maaf, saya tidak mengerti nominal transaksinya. Bisa diulang? (Contoh: kopi 15rb)"
 
-    # Cari Category ID berdasarkan saran AI (Opsional)
-    # Anda bisa menambahkan logika pencarian Category model di sini jika perlu
+    # Cari Account ID default user
+    account = UserRepository.get_default_account(db, user_id)
+    account_id = account.id if account else "00000000-0000-0000-0000-000000000000"
     
     data = {
-        "account_id": "660e8400-e29b-41d4-a716-446655440001",
+        "account_id": account_id,
+
         "amount": amount,
         "type": "expense",
         "description": description,
@@ -179,9 +189,14 @@ async def download_whatsapp_media(media_id):
     return file_path
 
 async def handle_image_message(media_id, phone):
-    user_id = USER_MAP.get(phone)
-    if not user_id:
-        return "User belum terdaftar"
+    db = SessionLocal()
+    user = UserRepository.get_by_phone(db, phone)
+    if not user:
+        login_url = f"{settings.BASE_URL}/api/v1/auth/login?phone={phone}"
+        return f"Maaf, nomor Anda belum terdaftar. Silakan login di sini: {login_url}"
+
+    user_id = user.id
+
 
     # Kirim pesan awal agar user tau bot sedang bekerja
     # (Opsional, tapi bagus untuk UX karena parsing butuh waktu)

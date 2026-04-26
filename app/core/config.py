@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     PHONE_NUMBER_ID: str
     GEMINI_API_KEY: str
 
+    # GOOGLE OAUTH2
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = ""
+    BASE_URL: str = "http://localhost:8000"
+
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

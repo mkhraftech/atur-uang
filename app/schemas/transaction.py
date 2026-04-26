@@ -10,16 +10,4 @@ class TransactionCreate(BaseModel):
     description: str
     transaction_date: date
     category_ids: List[UUID]
-    category_suggestion: Optional[str] = None
-
-
-class TransactionResponse(BaseModel):
-    id: UUID
-    account_id: UUID
-    amount: float
-    type: str
-    description: str
-    transaction_date: date
-
-    class Config:
-        from_attributes = True
+    category_suggestion: Optional[str] = None
