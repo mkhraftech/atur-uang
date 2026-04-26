@@ -61,7 +61,19 @@ async def handle_message(text: str, phone: str):
 
     # 🌍 TIMEZONE
     if text_lower == "timezone":
-        return f"🌍 Zona waktu Anda saat ini: *{user.timezone or 'Asia/Jakarta'}*\n\nWaktu sekarang: {user_now.strftime('%H:%M')} WIB/WITA/WIT"
+        from zoneinfo import ZoneInfo
+        from datetime import datetime
+        now_wib = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%H:%M")
+        now_wita = datetime.now(ZoneInfo("Asia/Makassar")).strftime("%H:%M")
+        now_wit = datetime.now(ZoneInfo("Asia/Jayapura")).strftime("%H:%M")
+        
+        return (
+            f"🌍 Zona waktu Anda: *{user.timezone or 'Asia/Jakarta'}*\n\n"
+            f"Waktu Sekarang:\n"
+            f"🇮🇩 WIB: {now_wib}\n"
+            f"🇮🇩 WITA: {now_wita}\n"
+            f"🇮🇩 WIT: {now_wit}"
+        )
 
     if text_lower.startswith("set timezone "):
         new_tz = text[13:].strip()
