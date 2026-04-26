@@ -20,7 +20,11 @@ class Settings(BaseSettings):
     VERIFY_TOKEN: str
     WHATSAPP_TOKEN: str
     PHONE_NUMBER_ID: str
+
+    # AI
     GEMINI_API_KEY: str
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.1-70b-versatile"
 
     # GOOGLE OAUTH2
     GOOGLE_CLIENT_ID: str = ""
