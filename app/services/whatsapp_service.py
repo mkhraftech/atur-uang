@@ -98,6 +98,7 @@ async def handle_transaction_input(text, user_id):
     amount = ai_data.get("amount")
     description = ai_data.get("description") or text
     category_suggestion = ai_data.get("category_suggestion")
+    trx_type = ai_data.get("type", "expense")
 
     if not amount:
         return "Maaf, saya tidak mengerti nominal transaksinya. Bisa diulang? (Contoh: kopi 15rb)"
@@ -106,13 +107,16 @@ async def handle_transaction_input(text, user_id):
     account = UserRepository.get_default_account(db, user_id)
     account_id = account.id if account else "00000000-0000-0000-0000-000000000000"
     
+    from datetime import datetime, timezone, timedelta
+    wib = timezone(timedelta(hours=7))
+    today_wib = datetime.now(wib).date()
+
     data = {
         "account_id": account_id,
-
         "amount": amount,
-        "type": "expense",
+        "type": trx_type,
         "description": description,
-        "transaction_date": date.today(),
+        "transaction_date": today_wib,
         "category_ids": []
     }
 
@@ -223,15 +227,19 @@ async def handle_image_message(media_id, phone):
 
 async def handle_today(user_id):
     db = SessionLocal()
+    from datetime import datetime, timezone, timedelta
+    wib = timezone(timedelta(hours=7))
+    today_str = datetime.now(wib).strftime("%Y-%m-%d")
 
     daily = TransactionService.get_daily(db, user_id)
+    
+    # Cari data yang tanggalnya cocok dengan hari ini di WIB
+    today_data = next((d for d in daily if d["date"] == today_str), None)
 
-    if not daily:
+    if not today_data:
         return "Belum ada transaksi hari ini"
 
-    today = daily[-1]
-
-    return f"📅 Hari ini: {today['total']}"
+    return f"📅 Hari ini: *Rp {today_data['total']:,.00f}*"
 
 
 async def handle_todo_reminder(text: str, user_id: str, phone: str) -> str:

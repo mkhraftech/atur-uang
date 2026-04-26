@@ -60,9 +60,10 @@ async def process_receipt_from_path(db, file_path, user_id):
     transaction_data = TransactionCreate(
         account_id=account_id, 
         amount=amount,
-        type="expense",
+        type=parsed_data.get("type", "expense"),
         description=description,
         transaction_date=date,
+
         category_ids=[], # Will be auto-detected by TransactionService if empty
         category_suggestion=category_suggestion
     )

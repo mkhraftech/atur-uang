@@ -37,6 +37,7 @@ class AIService:
             - category_suggestion: (string) A suggested category like 'Food', 'Transport', 'Shopping', 'Health', 'Bills'.
             - items: (list of strings) Brief names of individual items bought.
             - currency: (string) Three-letter currency code, default to 'IDR'.
+            - type: (string) Either 'expense' or 'income'. Default to 'expense'.
 
             Rules:
             1. If information is missing, use null for numbers or empty strings for text.
@@ -89,6 +90,10 @@ class AIService:
             raise ValueError("GEMINI_API_KEY is not configured.")
 
         try:
+            from datetime import datetime, timezone, timedelta
+            wib = timezone(timedelta(hours=7))
+            now_wib = datetime.now(wib).date()
+
             prompt = f"""
             Extract transaction details from this text accurately into a JSON format.
             Text: "{text}"
@@ -97,16 +102,16 @@ class AIService:
             
             Output MUST be a valid JSON with these fields:
             - amount: (number) The total amount spent or received.
-            - date: (string, YYYY-MM-DD) The date of the transaction. Default to today ({datetime.now().date()}).
+            - date: (string, YYYY-MM-DD) The date of the transaction. Default to today ({now_wib}).
             - merchant: (string) The name of the store or person involved.
             - description: (string) A short summary of the transaction.
             - category_suggestion: (string) Choose ONE that fits best from: 'Wajib', 'Harian', 'Jajan', 'Transport', 'Impulsif'. Default to 'Jajan' if unsure.
             - currency: (string) Default to 'IDR'.
+            - type: (string) Either 'expense' or 'income'. Detect this from context.
 
             Rules:
-            1. If it sounds like an income, mark it as such in the description but provide the amount as positive.
-            2. For amounts like '50rb', '50k', parse as 50000.
-            3. Return ONLY the JSON object.
+            1. For amounts like '50rb', '50k', parse as 50000.
+            2. Return ONLY the JSON object.
             """
             
             logger.debug(f"AI PROMPT: {prompt}")
@@ -130,6 +135,10 @@ class AIService:
             return receipt_data.model_dump(by_alias=True)
             
         except genai.errors.ServerError as e:
+            from datetime import datetime, timezone, timedelta
+            wib = timezone(timedelta(hours=7))
+            now_wib = datetime.now(wib).date()
+
             prompt = f"""
             Extract transaction details from this text accurately into a JSON format.
             Text: "{text}"
@@ -138,16 +147,16 @@ class AIService:
             
             Output MUST be a valid JSON with these fields:
             - amount: (number) The total amount spent or received.
-            - date: (string, YYYY-MM-DD) The date of the transaction. Default to today ({datetime.now().date()}).
+            - date: (string, YYYY-MM-DD) The date of the transaction. Default to today ({now_wib}).
             - merchant: (string) The name of the store or person involved.
             - description: (string) A short summary of the transaction.
             - category_suggestion: (string) Choose ONE that fits best from: 'Wajib', 'Harian', 'Jajan', 'Transport', 'Impulsif'. Default to 'Jajan' if unsure.
             - currency: (string) Default to 'IDR'.
+            - type: (string) Either 'expense' or 'income'. Detect this from context.
 
             Rules:
-            1. If it sounds like an income, mark it as such in the description but provide the amount as positive.
-            2. For amounts like '50rb', '50k', parse as 50000.
-            3. Return ONLY the JSON object.
+            1. For amounts like '50rb', '50k', parse as 50000.
+            2. Return ONLY the JSON object.
             """
             
             logger.debug(f"AI PROMPT: {prompt}")

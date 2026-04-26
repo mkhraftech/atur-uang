@@ -12,4 +12,6 @@ class ReceiptData(BaseModel):
     category_suggestion: Optional[str] = None
     currency: Optional[str] = "IDR"
     items: Optional[List[str]] = []
+    type: Optional[str] = "expense"
+
 
