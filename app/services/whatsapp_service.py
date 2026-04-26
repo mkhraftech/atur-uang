@@ -61,8 +61,6 @@ async def handle_message(text: str, phone: str):
 
     # 🌍 TIMEZONE
     if text_lower == "timezone":
-        from zoneinfo import ZoneInfo
-        from datetime import datetime
         now_wib = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%H:%M")
         now_wita = datetime.now(ZoneInfo("Asia/Makassar")).strftime("%H:%M")
         now_wit = datetime.now(ZoneInfo("Asia/Jayapura")).strftime("%H:%M")
@@ -70,9 +68,9 @@ async def handle_message(text: str, phone: str):
         return (
             f"🌍 Zona waktu Anda: *{user.timezone or 'Asia/Jakarta'}*\n\n"
             f"Waktu Sekarang:\n"
-            f"🇮🇩 WIB: {now_wib}\n"
-            f"🇮🇩 WITA: {now_wita}\n"
-            f"🇮🇩 WIT: {now_wit}"
+            f"WIB: {now_wib}\n"
+            f"WITA: {now_wita}\n"
+            f"WIT: {now_wit}"
         )
 
     if text_lower.startswith("set timezone"):
@@ -297,4 +295,4 @@ async def handle_todo_reminder(text: str, user_id: str, phone: str, user_now: da
         except Exception:
             logger.warning(f"Gagal parse remind_at: {remind_at_str}, simpan sebagai todo biasa")
 
-    return TodoService.add_todo(db, user_id, phone, todo_text)
+    return TodoService.add_todo(db, user_id, phone, todo_text)
