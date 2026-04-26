@@ -51,9 +51,14 @@ async def process_receipt_from_path(db, file_path, user_id):
             "data": parsed_data
         }
 
+    # Cari Account ID default user
+    from app.repositories.user_repository import UserRepository
+    account = UserRepository.get_default_account(db, user_id)
+    account_id = account.id if account else "00000000-0000-0000-0000-000000000000"
+
     # Prepare transaction data
     transaction_data = TransactionCreate(
-        account_id="660e8400-e29b-41d4-a716-446655440001", 
+        account_id=account_id, 
         amount=amount,
         type="expense",
         description=description,
