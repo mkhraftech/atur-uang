@@ -7,6 +7,7 @@ from app.models.category import Category
 from app.repositories.transaction_repository import TransactionRepository
 import uuid
 from app.core.logger import logger
+from datetime import date
 
 
 class TransactionService:
