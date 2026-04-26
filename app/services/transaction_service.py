@@ -171,21 +171,29 @@ class TransactionService:
 
     # 📅 DAILY SPENDING
     @staticmethod
-    def get_daily(db: Session, user_id):
+    def get_daily(db: Session, user_id, tz_name: str = "UTC"):
+        # Konversi UTC ke Timezone User sebelum di-grouping
+        # PostgreSQL syntax: transaction_date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Jakarta'
+        local_date = func.cast(
+            func.timezone(tz_name, func.timezone('UTC', Transaction.transaction_date)),
+            date
+        )
+
         result = db.query(
-            Transaction.transaction_date,
+            local_date,
             func.sum(Transaction.amount)
         ).filter(
             Transaction.user_id == user_id,
             Transaction.type == "expense"
-        ).group_by(Transaction.transaction_date)\
-         .order_by(Transaction.transaction_date)\
+        ).group_by(local_date)\
+         .order_by(local_date)\
          .all()
 
         return [
             {"date": str(r[0]), "total": float(r[1])}
             for r in result
         ]
+
 
     # 🔥 TOP SPENDING
     @staticmethod

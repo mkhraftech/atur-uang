@@ -14,4 +14,6 @@ class User(Base):
     google_id = Column(String(255), unique=True, nullable=False)
     picture = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True)
+    timezone = Column(String(50), default="Asia/Jakarta")
     created_at = Column(TIMESTAMP, server_default=func.now())
+

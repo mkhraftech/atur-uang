@@ -82,18 +82,18 @@ class AIService:
                 "error": str(e)
             }
 
-    async def parse_transaction_text(self, text: str) -> dict:
+    async def parse_transaction_text(self, text: str, user_now: datetime = None) -> dict:
         """
         Parses a natural language transaction text using Google Gemini AI.
         """
+        if user_now is None:
+            user_now = datetime.now()
+        
+        now_str = user_now.strftime("%Y-%m-%d")
         if not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY == "your_api_key_here":
             raise ValueError("GEMINI_API_KEY is not configured.")
 
         try:
-            from datetime import datetime, timezone, timedelta
-            wib = timezone(timedelta(hours=7))
-            now_wib = datetime.now(wib).date()
-
             prompt = f"""
             Extract transaction details from this text accurately into a JSON format.
             Text: "{text}"
@@ -102,7 +102,7 @@ class AIService:
             
             Output MUST be a valid JSON with these fields:
             - amount: (number) The total amount spent or received.
-            - date: (string, YYYY-MM-DD) The date of the transaction. Default to today ({now_wib}).
+            - date: (string, YYYY-MM-DD) The date of the transaction. Default to today ({now_str}).
             - merchant: (string) The name of the store or person involved.
             - description: (string) A short summary of the transaction.
             - category_suggestion: (string) Choose ONE that fits best from: 'Wajib', 'Harian', 'Jajan', 'Transport', 'Impulsif'. Default to 'Jajan' if unsure.
@@ -135,10 +135,6 @@ class AIService:
             return receipt_data.model_dump(by_alias=True)
             
         except genai.errors.ServerError as e:
-            from datetime import datetime, timezone, timedelta
-            wib = timezone(timedelta(hours=7))
-            now_wib = datetime.now(wib).date()
-
             prompt = f"""
             Extract transaction details from this text accurately into a JSON format.
             Text: "{text}"
@@ -147,7 +143,7 @@ class AIService:
             
             Output MUST be a valid JSON with these fields:
             - amount: (number) The total amount spent or received.
-            - date: (string, YYYY-MM-DD) The date of the transaction. Default to today ({now_wib}).
+            - date: (string, YYYY-MM-DD) The date of the transaction. Default to today ({now_str}).
             - merchant: (string) The name of the store or person involved.
             - description: (string) A short summary of the transaction.
             - category_suggestion: (string) Choose ONE that fits best from: 'Wajib', 'Harian', 'Jajan', 'Transport', 'Impulsif'. Default to 'Jajan' if unsure.
@@ -189,25 +185,30 @@ class AIService:
                 "currency": "IDR"
             }
 
-    async def parse_todo_reminder(self, text: str) -> dict:
+    async def parse_todo_reminder(self, text: str, user_now: datetime = None) -> dict:
         """
         Parse pesan todo/reminder dari teks natural.
         Return: { "todo_text": str, "remind_at": "YYYY-MM-DDTHH:MM:SS+07:00" | null }
         """
+        if user_now is None:
+            user_now = datetime.now()
+            
         try:
-            from datetime import timezone, timedelta
-            wib = timezone(timedelta(hours=7))
-            now_wib = datetime.now(wib)
+            now_str = user_now.strftime("%Y-%m-%d %H:%M")
+            offset_str = user_now.strftime("%z") or "+00:00"
+            # Ensure format is +HH:MM
+            if len(offset_str) == 5:
+                offset_str = offset_str[:3] + ":" + offset_str[3:]
 
             prompt = f"""
             Ekstrak informasi todo/reminder dari teks berikut dalam konteks Bahasa Indonesia.
             Teks: "{text}"
-            Waktu sekarang: {now_wib.strftime("%Y-%m-%d %H:%M")} (WIB, UTC+7)
+            Waktu sekarang: {now_str} (Offset {offset_str})
 
             Output MUST be valid JSON with:
             - todo_text: (string) isi todo/pengingat yang singkat dan jelas
-            - remind_at: (string | null) waktu reminder dalam format ISO 8601 dengan offset +07:00 (contoh: 2025-04-26T09:00:00+07:00).
-              PENTING: Gunakan tahun {now_wib.year} jika tidak disebutkan.
+            - remind_at: (string | null) waktu reminder dalam format ISO 8601 dengan offset {offset_str} (contoh: 2025-04-26T09:00:00{offset_str}).
+              PENTING: Gunakan tahun {user_now.year} jika tidak disebutkan.
               Null jika tidak ada waktu yang disebutkan.
 
             Contoh:

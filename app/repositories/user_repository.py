@@ -48,5 +48,14 @@ class UserRepository:
         return user
 
     @staticmethod
+    def update_timezone(db: Session, user_id: uuid.UUID, timezone: str):
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.timezone = timezone
+            db.commit()
+        return user
+
+    @staticmethod
     def get_default_account(db: Session, user_id: uuid.UUID) -> Account:
+
         return db.query(Account).filter(Account.user_id == user_id).first()

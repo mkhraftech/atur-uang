@@ -12,8 +12,17 @@ from app.core.logger import logger
 from app.core.database import SessionLocal
 
 from app.repositories.user_repository import UserRepository
+from zoneinfo import ZoneInfo
+from datetime import datetime
 
 settings = get_settings()
+
+def get_user_now(user):
+    tz_name = getattr(user, 'timezone', 'Asia/Jakarta') or 'Asia/Jakarta'
+    try:
+        return datetime.now(ZoneInfo(tz_name))
+    except Exception:
+        return datetime.now(ZoneInfo("Asia/Jakarta"))
 
 
 async def handle_message(text: str, phone: str):
@@ -35,18 +44,33 @@ async def handle_message(text: str, phone: str):
 
     text_lower = text.lower().strip()
 
+    user_now = get_user_now(user)
+
     # 📊 SUMMARY
     if text_lower == "summary":
         return await handle_summary(user_id)
 
     # 📊 HARI INI
     if text_lower == "hari ini":
-        return await handle_today(user_id)
+        return await handle_today(user, user_now)
 
     # 📋 LIST TODO
     if text_lower in ("list todo", "todo list", "daftar todo"):
         db = SessionLocal()
         return TodoService.list_todos(db, user_id)
+
+    # 🌍 TIMEZONE
+    if text_lower == "timezone":
+        return f"🌍 Zona waktu Anda saat ini: *{user.timezone or 'Asia/Jakarta'}*\n\nWaktu sekarang: {user_now.strftime('%H:%M')} WIB/WITA/WIT"
+
+    if text_lower.startswith("set timezone "):
+        new_tz = text[13:].strip()
+        try:
+            ZoneInfo(new_tz) # Validate
+            UserRepository.update_timezone(db, user_id, new_tz)
+            return f"✅ Zona waktu berhasil diubah ke: *{new_tz}*"
+        except Exception:
+            return "❌ Zona waktu tidak valid. Contoh: `Asia/Jakarta`, `Asia/Makassar`, `Asia/Jayapura`."
 
     # ✅ SELESAI <nomor>
     match_done = re.match(r"^(selesai|done)\s+(\d+)$", text_lower)
@@ -66,10 +90,10 @@ async def handle_message(text: str, phone: str):
         "ingatkan", "remind", "reminder", "pengingat"
     ))
     if is_todo or is_reminder:
-        return await handle_todo_reminder(text, user_id, phone)
+        return await handle_todo_reminder(text, user_id, phone, user_now)
 
     # ➕ INPUT TRANSACTION
-    return await handle_transaction_input(text, user_id)
+    return await handle_transaction_input(text, user_id, user_now)
 
 
 
@@ -89,11 +113,11 @@ from datetime import date
 from app.schemas.transaction import TransactionCreate
 
 
-async def handle_transaction_input(text, user_id):
+async def handle_transaction_input(text, user_id, user_now):
     db = SessionLocal()
 
     # Menggunakan AI untuk parsing teks natural
-    ai_data = await ai_service.parse_transaction_text(text)
+    ai_data = await ai_service.parse_transaction_text(text, user_now)
     
     amount = ai_data.get("amount")
     description = ai_data.get("description") or text
@@ -107,16 +131,12 @@ async def handle_transaction_input(text, user_id):
     account = UserRepository.get_default_account(db, user_id)
     account_id = account.id if account else "00000000-0000-0000-0000-000000000000"
     
-    from datetime import datetime, timezone, timedelta
-    wib = timezone(timedelta(hours=7))
-    today_wib = datetime.now(wib).date()
-
     data = {
         "account_id": account_id,
         "amount": amount,
         "type": trx_type,
         "description": description,
-        "transaction_date": today_wib,
+        "transaction_date": user_now,
         "category_ids": []
     }
 
@@ -225,27 +245,27 @@ async def handle_image_message(media_id, phone):
     else:
         return f"❌ Gagal memproses struk: {result.get('error')}"
 
-async def handle_today(user_id):
+async def handle_today(user, user_now):
     db = SessionLocal()
-    from datetime import datetime, timezone, timedelta
-    wib = timezone(timedelta(hours=7))
-    today_str = datetime.now(wib).strftime("%Y-%m-%d")
+    today_str = user_now.strftime("%Y-%m-%d")
+    tz_name = user.timezone or "Asia/Jakarta"
 
-    daily = TransactionService.get_daily(db, user_id)
+    daily = TransactionService.get_daily(db, user.id, tz_name)
+
     
-    # Cari data yang tanggalnya cocok dengan hari ini di WIB
+    # Cari data yang tanggalnya cocok dengan hari ini di local timezone user
     today_data = next((d for d in daily if d["date"] == today_str), None)
 
     if not today_data:
         return "Belum ada transaksi hari ini"
 
-    return f"📅 Hari ini: *Rp {today_data['total']:,.00f}*"
+    return f"📅 Hari ini ({user_now.strftime('%d %b')}): *Rp {today_data['total']:,.00f}*"
 
 
-async def handle_todo_reminder(text: str, user_id: str, phone: str) -> str:
+async def handle_todo_reminder(text: str, user_id: str, phone: str, user_now: datetime) -> str:
     """Parse teks todo/reminder dengan AI, simpan ke DB."""
     db = SessionLocal()
-    parsed = await ai_service.parse_todo_reminder(text)
+    parsed = await ai_service.parse_todo_reminder(text, user_now)
 
     todo_text = parsed.get("todo_text") or text
     remind_at_str = parsed.get("remind_at")

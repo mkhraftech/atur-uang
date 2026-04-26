@@ -13,6 +13,6 @@ class Transaction(Base):
     account_id = Column(UUID(as_uuid=True))
     amount = Column(Numeric, nullable=False)
     type = Column(String(10))  # income / expense
-    description = Column(String)
-    transaction_date = Column(Date)
-    created_at = Column(TIMESTAMP)
+    description = Column(String(255))
+    transaction_date = Column(TIMESTAMP, server_default=func.now())
+    created_at = Column(TIMESTAMP, server_default=func.now())

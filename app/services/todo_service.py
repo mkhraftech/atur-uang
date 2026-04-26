@@ -14,12 +14,10 @@ class TodoService:
     @staticmethod
     def add_reminder(db: Session, user_id: str, phone: str, text: str, remind_at) -> str:
         todo = TodoRepository.create(db, user_id, phone, text, remind_at=remind_at)
-        # Format waktu lokal (WIB = UTC+7)
-        from datetime import timezone, timedelta
-        wib = timezone(timedelta(hours=7))
-        time_str = remind_at.astimezone(wib).strftime("%d %b %Y %H:%M") if remind_at else "-"
+        # Tampilkan waktu sesuai timezone asli dari object remind_at
+        time_str = remind_at.strftime("%d %b %H:%M") if remind_at else "-"
         logger.info(f"Reminder created: {todo.id} at {remind_at}")
-        return f"⏰ Reminder diset!\n📌 *{text}*\n🕐 {time_str} WIB"
+        return f"⏰ Reminder diset!\n📌 *{text}*\n🕐 {time_str}"
 
     @staticmethod
     def list_todos(db: Session, user_id: str) -> str:
@@ -32,9 +30,7 @@ class TodoService:
             icon = "⏰" if t.remind_at else "📌"
             reminder_info = ""
             if t.remind_at:
-                from datetime import timezone, timedelta
-                wib = timezone(timedelta(hours=7))
-                reminder_info = f" _(reminder: {t.remind_at.astimezone(wib).strftime('%d %b %H:%M')} WIB)_"
+                reminder_info = f" _(reminder: {t.remind_at.strftime('%d %b %H:%M')})_"
             lines.append(f"{i}. {icon} {t.text}{reminder_info}")
 
         lines.append("\nKetik *selesai <nomor>* atau *hapus <nomor>* untuk mengelola.")
