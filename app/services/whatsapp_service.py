@@ -75,14 +75,20 @@ async def handle_message(text: str, phone: str):
             f"🇮🇩 WIT: {now_wit}"
         )
 
-    if text_lower.startswith("set timezone "):
-        new_tz = text[13:].strip()
-        try:
-            ZoneInfo(new_tz) # Validate
-            UserRepository.update_timezone(db, user_id, new_tz)
-            return f"✅ Zona waktu berhasil diubah ke: *{new_tz}*"
-        except Exception:
-            return "❌ Zona waktu tidak valid. Contoh: `Asia/Jakarta`, `Asia/Makassar`, `Asia/Jayapura`."
+    if text_lower.startswith("set timezone"):
+        # Ambil semua teks setelah 'set timezone' (menggunakan regex agar lebih fleksibel dengan spasi/titik dua)
+        match = re.search(r"set\s+timezone[:\s]+(.+)", text, re.IGNORECASE)
+        if match:
+            new_tz = match.group(1).strip()
+            try:
+                ZoneInfo(new_tz) # Validate
+                UserRepository.update_timezone(db, user_id, new_tz)
+                return f"✅ Zona waktu berhasil diubah ke: *{new_tz}*"
+            except Exception as e:
+                logger.error(f"Gagal set timezone '{new_tz}': {e}")
+                return f"❌ Zona waktu tidak valid: *{new_tz}*\n\nContoh yang benar: `Asia/Jakarta`, `Asia/Makassar`, `Asia/Jayapura`."
+        else:
+            return "❌ Format salah. Gunakan: `set timezone <nama_zona>`"
 
     # ✅ SELESAI <nomor>
     match_done = re.match(r"^(selesai|done)\s+(\d+)$", text_lower)
