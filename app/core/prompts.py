@@ -12,9 +12,18 @@ Output MUST be a valid JSON with these fields:
 - date: (string, YYYY-MM-DD) Default to today ({now_str}).
 - merchant: (string)
 - description: (string)
-- category_suggestion: (string) Choose ONE: 'Wajib', 'Kebutuhan Pokok', 'Jajan', 'Transport', 'Impulsif'.
+- category_suggestion: (string) Choose ONE from categories below.
 - currency: (string) Default 'IDR'.
 - type: (string) 'expense' or 'income'.
+
+Categories & Definitions:
+- 'Wajib': Pembayaran hutang, cicilan, asuransi, pajak, biaya sekolah.
+- 'Kebutuhan Pokok': Sembako, makan rutin, listrik, air, pulsa/data, internet.
+- 'Kebutuhan Non-Rutin': Pembelian besar yang perlu tapi tidak rutin (Beli AC, perbaikan rumah, biaya RS, servis besar).
+- 'Transport': Bensin, parkir, ojek online, tiket transportasi.
+- 'Jajan': Makan di luar, kopi, bioskop, hiburan.
+- 'Piutang': Menghutangi atau meminjamkan uang kepada orang lain.
+- 'Impulsif': Belanja hobi, barang yang tidak direncanakan, atau keinginan semata.
 
 Rules:
 1. For amounts like '50rb', '50k', parse as 50000.
@@ -31,7 +40,7 @@ Output MUST be a valid JSON with these fields:
 - date: (string, YYYY-MM-DD) The date of the transaction.
 - merchant: (string)
 - description: (string)
-- category_suggestion: (string) 'Food', 'Transport', 'Shopping', 'Health', 'Bills'.
+- category_suggestion: (string) Choose ONE: 'Wajib', 'Kebutuhan Pokok', 'Kebutuhan Non-Rutin', 'Transport', 'Jajan', 'Impulsif'.
 - items: (list of strings)
 - currency: (string) Default 'IDR'.
 - type: (string) 'expense' or 'income'.
