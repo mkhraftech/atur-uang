@@ -83,26 +83,49 @@ class AIService:
             logger.warning(f"Gemini failed, using Groq: {e}")
             return await self._call_fallback_groq(prompt, now_str, text)
 
-    async def _call_fallback_groq(self, prompt: str, now_str: str, original_text: str) -> dict:
-        if not settings.GROQ_API_KEY: 
-            return {"amount": None, "date": now_str, "description": original_text, "type": "expense"}
+    async def _make_groq_request(self, prompt: str) -> str:
+        """Helper to make a Groq API request with robust error handling."""
+        if not settings.GROQ_API_KEY:
+            return None
         
         url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}", "Content-Type": "application/json"}
+        headers = {
+            "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
         payload = {
-            "model": settings.GROQ_MODEL, 
-            "messages": [{"role": "user", "content": prompt}], 
+            "model": settings.GROQ_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"}
         }
-        
+
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(url, headers=headers, json=payload, timeout=10.0)
-                content = response.json()['choices'][0]['message']['content']
-                return json.loads(content)
+                response = await client.post(url, headers=headers, json=payload, timeout=15.0)
+                
+                if response.status_code != 200:
+                    logger.error(f"Groq API returned error {response.status_code}: {response.text}")
+                    return None
+                
+                resp_json = response.json()
+                if 'choices' not in resp_json or not resp_json['choices']:
+                    logger.error(f"Groq API response missing 'choices': {resp_json}")
+                    return None
+                
+                return resp_json['choices'][0]['message']['content']
         except Exception as e:
-            logger.error(f"Groq failed: {e}")
-            return {"amount": None, "date": now_str, "description": original_text, "type": "expense"}
+            logger.error(f"Failed to call Groq API: {e}", exc_info=True)
+            return None
+
+    async def _call_fallback_groq(self, prompt: str, now_str: str, original_text: str) -> dict:
+        content = await self._make_groq_request(prompt)
+        if content:
+            try:
+                return json.loads(content)
+            except Exception as e:
+                logger.error(f"Failed to parse Groq response as JSON: {e}")
+        
+        return {"amount": None, "date": now_str, "description": original_text, "type": "expense"}
 
     async def parse_todo_reminder(self, text: str, user_now: datetime = None) -> dict:
         if user_now is None: user_now = datetime.now()
@@ -129,22 +152,14 @@ class AIService:
             return await self._call_fallback_todo_groq(prompt, text)
 
     async def _call_fallback_todo_groq(self, prompt: str, original_text: str) -> dict:
-        if not settings.GROQ_API_KEY: return {"todo_text": original_text, "remind_at": None}
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}", "Content-Type": "application/json"}
-        payload = {
-            "model": settings.GROQ_MODEL, 
-            "messages": [{"role": "user", "content": prompt}], 
-            "response_format": {"type": "json_object"}
-        }
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(url, headers=headers, json=payload, timeout=10.0)
-                content = response.json()['choices'][0]['message']['content']
+        content = await self._make_groq_request(prompt)
+        if content:
+            try:
                 return json.loads(content)
-        except Exception as e:
-            logger.error(f"Groq fallback for todo failed: {e}")
-            return {"todo_text": original_text, "remind_at": None}
+            except Exception as e:
+                logger.error(f"Failed to parse Groq todo response as JSON: {e}")
+        
+        return {"todo_text": original_text, "remind_at": None}
 
 
 ai_service = AIService()
