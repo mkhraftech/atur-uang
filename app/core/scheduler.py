@@ -9,24 +9,22 @@ scheduler = AsyncIOScheduler()
 
 async def _check_reminders():
     """Dipanggil tiap menit: cek reminder yang sudah jatuh tempo dan kirim WA."""
-    db = SessionLocal()
     try:
-        due = TodoRepository.get_due_reminders(db)
-        if not due:
-            return
+        with SessionLocal() as db:
+            due = TodoRepository.get_due_reminders(db)
+            if not due:
+                return
 
-        # Import di sini untuk hindari circular import
-        from app.services.whatsapp_service import send_whatsapp_message
+            # Import di sini untuk hindari circular import
+            from app.services.whatsapp_service import send_whatsapp_message
 
-        for todo in due:
-            msg = f"⏰ *Reminder!*\n📌 {todo.text}"
-            send_whatsapp_message(todo.phone, msg)
-            TodoRepository.mark_reminded(db, todo)
-            logger.info(f"Reminder sent for todo {todo.id} to {todo.phone}")
+            for todo in due:
+                msg = f"⏰ *Reminder!*\n📌 {todo.text}"
+                send_whatsapp_message(todo.phone, msg)
+                TodoRepository.mark_reminded(db, todo)
+                logger.info(f"Reminder sent for todo {todo.id} to {todo.phone}")
     except Exception as e:
-        logger.exception(f"Error in reminder check: {e}")
-    finally:
-        db.close()
+        logger.error(f"Error in scheduler reminder check: {e}")
 
 
 def start_scheduler():
