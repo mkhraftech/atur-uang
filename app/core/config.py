@@ -23,14 +23,15 @@ class Settings(BaseSettings):
 
     # AI
     GEMINI_API_KEY: str
-    GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GEMINI_MODEL: str
+    GROQ_API_KEY: str
+    GROQ_MODEL: str
 
     # GOOGLE OAUTH2
-    GOOGLE_CLIENT_ID: str = ""
-    GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = ""
-    BASE_URL: str = "http://localhost:8000"
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
+    GOOGLE_REDIRECT_URI: str
+    BASE_URL: str
 
 
     class Config:
