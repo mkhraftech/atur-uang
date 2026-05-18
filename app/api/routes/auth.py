@@ -82,7 +82,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
 
         # Notify user via WhatsApp if phone is available
         if phone:
-            send_whatsapp_message(
+            await send_whatsapp_message(
                 phone, 
                 f"✅ *Pendaftaran Berhasil!*\n\nHalo {name}, akun Anda telah terhubung dengan Google ({email}). Sekarang Anda bisa mulai mencatat transaksi langsung dari sini. 👍"
             )

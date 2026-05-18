@@ -20,7 +20,7 @@ async def _check_reminders():
 
             for todo in due:
                 msg = f"⏰ *Reminder!*\n📌 {todo.text}"
-                send_whatsapp_message(todo.phone, msg)
+                await send_whatsapp_message(todo.phone, msg)
                 TodoRepository.mark_reminded(db, todo)
                 logger.info(f"Reminder sent for todo {todo.id} to {todo.phone}")
     except Exception as e:

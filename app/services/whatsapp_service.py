@@ -1,4 +1,4 @@
-import requests
+import httpx
 import os
 import re
 import uuid
@@ -174,7 +174,7 @@ async def handle_summary(user_id):
             f"💳 Saldo: *Rp {summary['balance']:,.00f}*"
         )
 
-def send_whatsapp_message(to, text):
+async def send_whatsapp_message(to, text):
     url = f"https://graph.facebook.com/v18.0/{settings.PHONE_NUMBER_ID}/messages"
 
     headers = {
@@ -189,29 +189,31 @@ def send_whatsapp_message(to, text):
         "text": {"body": text}
     }
 
-    response = requests.post(url, headers=headers, json=payload)
-    logger.debug(f"WHATSAPP RESPONSE: {response.status_code} - {response.text}")
-    return response.json()
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, headers=headers, json=payload)
+        logger.debug(f"WHATSAPP RESPONSE: {response.status_code} - {response.text}")
+        return response.json()
 
 async def download_whatsapp_media(media_id):
     # 1. Get Media URL from Meta
     headers = {"Authorization": f"Bearer {settings.WHATSAPP_TOKEN}"}
     url = f"https://graph.facebook.com/v18.0/{media_id}"
     
-    res = requests.get(url, headers=headers)
-    if res.status_code != 200:
-        logger.error(f"Error fetching media URL: {res.text}")
-        return None
-        
-    media_url = res.json().get("url")
-    if not media_url:
-        return None
+    async with httpx.AsyncClient() as client:
+        res = await client.get(url, headers=headers)
+        if res.status_code != 200:
+            logger.error(f"Error fetching media URL: {res.text}")
+            return None
+            
+        media_url = res.json().get("url")
+        if not media_url:
+            return None
 
-    # 2. Download the binary data
-    res_bin = requests.get(media_url, headers=headers)
-    if res_bin.status_code != 200:
-        logger.error(f"Error downloading media: {res_bin.text}")
-        return None
+        # 2. Download the binary data
+        res_bin = await client.get(media_url, headers=headers)
+        if res_bin.status_code != 200:
+            logger.error(f"Error downloading media: {res_bin.text}")
+            return None
 
     # 3. Save to uploads/
     os.makedirs("uploads", exist_ok=True)

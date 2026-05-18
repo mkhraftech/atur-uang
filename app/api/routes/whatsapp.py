@@ -26,24 +26,29 @@ def verify_webhook(request: Request):
 
 # ─── Background task wrappers ───────────────────────────────────────────────
 
+processed_message_ids = set()
+MAX_CACHE_SIZE = 1000
+
 async def _process_text(text: str, phone: str):
     """Dijalankan di background: parse teks via AI lalu kirim balasan."""
     try:
+        await send_whatsapp_message(phone, "⏳ Sedang diproses...")
         result = await handle_message(text, phone)
-        send_whatsapp_message(phone, result)
+        await send_whatsapp_message(phone, result)
     except Exception as e:
         logger.exception(f"Background task error (text): {e}")
-        send_whatsapp_message(phone, "❌ Terjadi kesalahan saat memproses pesan.")
+        await send_whatsapp_message(phone, "❌ Terjadi kesalahan saat memproses pesan.")
 
 
 async def _process_image(media_id: str, phone: str):
     """Dijalankan di background: download + parse foto struk lalu kirim balasan."""
     try:
+        await send_whatsapp_message(phone, "⏳ Sedang memproses foto struk Anda...")
         result = await handle_image_message(media_id, phone)
-        send_whatsapp_message(phone, result)
+        await send_whatsapp_message(phone, result)
     except Exception as e:
         logger.exception(f"Background task error (image): {e}")
-        send_whatsapp_message(phone, "❌ Terjadi kesalahan saat memproses foto struk.")
+        await send_whatsapp_message(phone, "❌ Terjadi kesalahan saat memproses foto struk.")
 
 
 # 📩 RECEIVE MESSAGE
@@ -57,22 +62,30 @@ async def receive_message(request: Request, background_tasks: BackgroundTasks):
 
         if "messages" in value:
             message = value["messages"][0]
+            message_id = message.get("id")
             phone = message["from"]
             msg_type = message.get("type")
 
+            # 🛑 Deduplikasi menggunakan message_id
+            if message_id:
+                if message_id in processed_message_ids:
+                    logger.info(f"Duplicate WhatsApp message_id ignored: {message_id}")
+                    return {"status": "ok"}
+
+                processed_message_ids.add(message_id)
+                if len(processed_message_ids) > MAX_CACHE_SIZE:
+                    processed_message_ids.pop()
+
             if msg_type == "text":
                 text = message["text"]["body"]
-                # Balas segera agar WhatsApp tidak timeout, proses di background
-                send_whatsapp_message(phone, "⏳ Sedang diproses...")
                 background_tasks.add_task(_process_text, text, phone)
 
             elif msg_type == "image":
                 media_id = message["image"]["id"]
-                send_whatsapp_message(phone, "⏳ Sedang memproses foto struk Anda...")
                 background_tasks.add_task(_process_image, media_id, phone)
 
             else:
-                send_whatsapp_message(
+                await send_whatsapp_message(
                     phone,
                     "Maaf, saya hanya bisa memproses pesan teks atau foto struk."
                 )
