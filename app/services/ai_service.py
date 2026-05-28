@@ -7,7 +7,7 @@ from datetime import datetime
 from app.core.config import get_settings
 from app.schemas.ai import ReceiptData
 from app.core.logger import logger
-from app.core.prompts import TRANSACTION_PARSER_PROMPT, RECEIPT_PARSER_PROMPT, TODO_REMINDER_PROMPT
+from app.core.prompts import TRANSACTION_PARSER_PROMPT, RECEIPT_PARSER_PROMPT, TODO_REMINDER_PROMPT, INTENT_ROUTER_PROMPT
 import httpx
 
 settings = get_settings()
@@ -160,6 +160,31 @@ class AIService:
                 logger.error(f"Failed to parse Groq todo response as JSON: {e}")
         
         return {"todo_text": original_text, "remind_at": None}
+
+    async def route_intent(self, text: str, user_now: datetime = None) -> dict:
+        if user_now is None: user_now = datetime.now()
+        now_str = user_now.strftime("%Y-%m-%d %H:%M:%S")
+        
+        prompt = INTENT_ROUTER_PROMPT.format(text=text, now_str=now_str)
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name, 
+                contents=[prompt],
+                config=types.GenerateContentConfig(response_mime_type="application/json")
+            )
+            return json.loads(response.text.strip())
+        except Exception as e:
+            logger.warning(f"Gemini failed to route intent, using Groq fallback: {e}")
+            content = await self._make_groq_request(prompt)
+            if content:
+                try:
+                    return json.loads(content)
+                except Exception as ex:
+                    logger.error(f"Failed to parse Groq response as JSON for intent routing: {ex}")
+            # Safe default fallback
+            return {"intent": "record_transaction", "parameters": {}}
+
 
 
 ai_service = AIService()

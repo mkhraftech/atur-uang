@@ -42,23 +42,24 @@ async def handle_message(text: str, phone: str):
                 )
 
             user_id = user.id
-            text_lower = text.lower().strip()
             user_now = get_user_now(user)
+            # Panggil AI Intent Router untuk menganalisis pesan user
+            routing_info = await ai_service.route_intent(text, user_now)
+            intent = routing_info.get("intent")
+            params = routing_info.get("parameters") or {}
 
             # 📊 SUMMARY
-            if text_lower in ("summary", "bulan ini", "bulan lalu"):
-                return await handle_monthly_summary(user, user_now, text_lower)
-
-            # 📊 HARI INI
-            if text_lower == "hari ini":
-                return await handle_today(user, user_now)
+            if intent == "summary":
+                start_date_str = params.get("start_date")
+                end_date_str = params.get("end_date")
+                return await handle_ai_summary(user, user_now, start_date_str, end_date_str)
 
             # 📋 LIST TODO
-            if text_lower in ("list todo", "todo list", "daftar todo"):
+            elif intent == "list_todo":
                 return TodoService.list_todos(db, user_id)
 
             # 🌍 TIMEZONE
-            if text_lower == "timezone":
+            elif intent == "show_timezone":
                 now_wib = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%H:%M")
                 now_wita = datetime.now(ZoneInfo("Asia/Makassar")).strftime("%H:%M")
                 now_wit = datetime.now(ZoneInfo("Asia/Jayapura")).strftime("%H:%M")
@@ -71,10 +72,10 @@ async def handle_message(text: str, phone: str):
                     f"WIT: {now_wit}"
                 )
 
-            if text_lower.startswith("set timezone"):
-                match = re.search(r"set\s+timezone[:\s]+(.+)", text, re.IGNORECASE)
-                if match:
-                    new_tz = match.group(1).strip()
+            elif intent == "set_timezone":
+                new_tz = params.get("timezone") or ""
+                new_tz = new_tz.strip()
+                if new_tz:
                     try:
                         ZoneInfo(new_tz) # Validate
                         UserRepository.update_timezone(db, user_id, new_tz)
@@ -86,25 +87,26 @@ async def handle_message(text: str, phone: str):
                     return "❌ Format salah. Gunakan: `set timezone <nama_zona>`"
 
             # ✅ SELESAI <nomor>
-            match_done = re.match(r"^(selesai|done)\s+(\d+)$", text_lower)
-            if match_done:
-                return TodoService.complete_todo(db, user_id, int(match_done.group(2)))
+            elif intent == "complete_todo":
+                todo_id = params.get("todo_id")
+                if todo_id is not None:
+                    return TodoService.complete_todo(db, user_id, int(todo_id))
+                return "❌ ID Todo tidak ditemukan. Contoh: `selesai 3`"
 
             # 🗑️ HAPUS <nomor>
-            match_del = re.match(r"^(hapus|delete|del)\s+(\d+)$", text_lower)
-            if match_del:
-                return TodoService.delete_todo(db, user_id, int(match_del.group(2)))
+            elif intent == "delete_todo":
+                todo_id = params.get("todo_id")
+                if todo_id is not None:
+                    return TodoService.delete_todo(db, user_id, int(todo_id))
+                return "❌ ID Todo tidak ditemukan. Contoh: `hapus 2`"
 
             # ➕ TODO / REMINDER (natural language)
-            is_todo = text_lower.startswith("todo:") or text_lower.startswith("todo ")
-            is_reminder = any(text_lower.startswith(kw) for kw in (
-                "ingatkan", "remind", "reminder", "pengingat"
-            ))
-            if is_todo or is_reminder:
+            elif intent == "todo_reminder":
                 return await handle_todo_reminder(text, user_id, phone, user_now)
 
-            # ➕ INPUT TRANSACTION
-            return await handle_transaction_input(text, user_id, user_now)
+            # ➕ INPUT TRANSACTION (default/fallback)
+            else:
+                return await handle_transaction_input(text, user_id, user_now)
     except Exception as e:
         logger.exception(f"Error handling message: {e}")
         return "⚠️ Maaf, terjadi kesalahan saat memproses pesan Anda. Silakan coba lagi nanti."
@@ -198,51 +200,40 @@ async def handle_transaction_input(text, user_id, user_now):
             joined_list = "\n\n".join(recorded_messages)
             return f"✅ Berhasil mencatat {len(recorded_messages)} transaksi:\n\n{joined_list}"
 
-async def handle_monthly_summary(user, user_now, command):
-    import calendar
+async def handle_ai_summary(user, user_now, start_date_str: str = None, end_date_str: str = None):
     import datetime as dt
     user_id = user.id
     tz_name = user.timezone or "Asia/Jakarta"
     
-    month_ids = {
-        "January": "Januari", "February": "Februari", "March": "Maret", "April": "April",
-        "May": "Mei", "June": "Juni", "July": "Juli", "August": "Agustus",
-        "September": "September", "October": "Oktober", "November": "November", "December": "Desember"
-    }
-
-    def format_month_id(year, month):
-        temp_date = dt.date(year, month, 1)
-        eng_name = temp_date.strftime("%B")
-        ind_name = month_ids.get(eng_name, eng_name)
-        return f"{ind_name} {year}"
-
     with SessionLocal() as db:
-        if command == "summary":
+        if not start_date_str or not end_date_str:
             # All-time summary
             summary = TransactionService.get_summary(db, user_id)
             title = "📊 *Ringkasan Keuangan (Semua Waktu)*"
         else:
-            if command == "bulan ini":
-                start_date = dt.date(user_now.year, user_now.month, 1)
-                _, last_day = calendar.monthrange(user_now.year, user_now.month)
-                end_date = dt.date(user_now.year, user_now.month, last_day)
-                month_label = format_month_id(user_now.year, user_now.month)
-                title = f"📊 *Ringkasan Keuangan Bulan Ini ({month_label})*"
-            else: # "bulan lalu"
-                if user_now.month == 1:
-                    last_month_year = user_now.year - 1
-                    last_month = 12
-                else:
-                    last_month_year = user_now.year
-                    last_month = user_now.month - 1
-                
-                start_date = dt.date(last_month_year, last_month, 1)
-                _, last_day = calendar.monthrange(last_month_year, last_month)
-                end_date = dt.date(last_month_year, last_month, last_day)
-                month_label = format_month_id(last_month_year, last_month)
-                title = f"📊 *Ringkasan Keuangan Bulan Lalu ({month_label})*"
+            try:
+                start_date = dt.datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                end_date = dt.datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            except Exception as e:
+                logger.error(f"Gagal parse date parameter untuk summary: {e}")
+                # Fallback to all-time
+                summary = TransactionService.get_summary(db, user_id)
+                title = "📊 *Ringkasan Keuangan (Semua Waktu)*"
+                return (
+                    f"{title}:\n\n"
+                    f"📉 Pengeluaran: Rp {summary['total_expense']:,.00f}\n"
+                    f"📈 Pemasukan: Rp {summary['total_income']:,.00f}\n"
+                    f"💳 Saldo: *Rp {summary['balance']:,.00f}*"
+                )
 
             summary = TransactionService.get_monthly_summary(db, user_id, start_date, end_date, tz_name)
+            
+            # Format title nicely
+            if start_date == end_date:
+                # E.g., "28 Mei 2026"
+                title = f"📊 *Ringkasan Keuangan Tanggal {start_date.strftime('%d-%m-%Y')}*"
+            else:
+                title = f"📊 *Ringkasan Keuangan Periode {start_date.strftime('%d-%m-%Y')} s/d {end_date.strftime('%d-%m-%Y')}*"
 
         return (
             f"{title}:\n\n"
@@ -329,20 +320,7 @@ async def handle_image_message(media_id, phone):
         else:
             return f"❌ Gagal memproses struk: {result.get('error')}"
 
-async def handle_today(user, user_now):
-    with SessionLocal() as db:
-        today_str = user_now.strftime("%Y-%m-%d")
-        tz_name = user.timezone or "Asia/Jakarta"
 
-        daily = TransactionService.get_daily(db, user.id, tz_name)
-
-        # Cari data yang tanggalnya cocok dengan hari ini di local timezone user
-        today_data = next((d for d in daily if d["date"] == today_str), None)
-
-        if not today_data:
-            return "Belum ada transaksi hari ini"
-
-        return f"📅 Hari ini ({user_now.strftime('%d %b')}): *Rp {today_data['total']:,.00f}*"
 
 
 async def handle_todo_reminder(text: str, user_id: str, phone: str, user_now: datetime) -> str:

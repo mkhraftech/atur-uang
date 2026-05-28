@@ -77,3 +77,36 @@ Output MUST be valid JSON with:
 
 Return ONLY the JSON object.
 """
+
+# Prompt for Chat Intent Routing
+INTENT_ROUTER_PROMPT = """
+Analyze the following user chat message and determine the user's intent.
+Text: "{text}"
+Today is: {now_str} (format YYYY-MM-DD HH:MM:SS)
+
+Classify the intent into ONE of these categories:
+1. "summary": The user wants to see a financial summary/rekap. This includes queries for:
+   - All time summary (e.g., "summary", "rekap keuangan", "saldo saya")
+   - Specific periods (e.g., "hari ini", "kemarin", "bulan ini", "bulan lalu", "minggu ini", "2 hari lalu", "pengeluaran 3 hari terakhir", "pemasukan minggu lalu").
+   For this intent, calculate the `start_date` and `end_date` relative to today ({now_str}) in 'YYYY-MM-DD' format. If it is all-time summary (not specifying a period), set both to null.
+2. "list_todo": The user wants to view their todo list (e.g., "list todo", "daftar pengingat", "todo list").
+3. "complete_todo": The user wants to mark a todo as done/completed (e.g., "done 3", "selesai 5", "todo 1 selesai"). Extract the integer ID as `todo_id`.
+4. "delete_todo": The user wants to delete/remove a todo (e.g., "hapus 2", "delete 10", "del 4"). Extract the integer ID as `todo_id`.
+5. "show_timezone": The user wants to check their timezone settings (e.g., "timezone", "cek zona waktu").
+6. "set_timezone": The user wants to set/change their timezone (e.g., "set timezone Asia/Makassar"). Extract the timezone name as `timezone`.
+7. "todo_reminder": The user wants to add a new todo or a reminder. This typically starts with keywords like "todo", "ingatkan", "remind", "reminder", "pengingat", or phrases like "ingatkan saya untuk...".
+8. "record_transaction": The user wants to input/record transactions (e.g., "kopi 15rb", "gas 20k", "pemasukan gajian 5jt", "tadi pagi beli bensin 50rb"). If it does not match any of the above intents and looks like financial recording, classify as "record_transaction".
+
+Output MUST be a valid JSON with this format:
+{{
+  "intent": "summary" | "list_todo" | "complete_todo" | "delete_todo" | "show_timezone" | "set_timezone" | "todo_reminder" | "record_transaction",
+  "parameters": {{
+    "start_date": (string, YYYY-MM-DD or null),
+    "end_date": (string, YYYY-MM-DD or null),
+    "todo_id": (integer or null),
+    "timezone": (string or null)
+  }}
+}}
+
+Return ONLY the JSON object.
+"""
