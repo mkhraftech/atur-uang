@@ -68,7 +68,7 @@ class AIService:
 
     async def parse_transaction_text(self, text: str, user_now: datetime = None) -> dict:
         if user_now is None: user_now = datetime.now()
-        now_str = user_now.strftime("%Y-%m-%d")
+        now_str = user_now.strftime("%Y-%m-%d %H:%M:%S")
         
         prompt = TRANSACTION_PARSER_PROMPT.format(text=text, now_str=now_str)
 

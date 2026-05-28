@@ -2,19 +2,26 @@
 # Prompt for Transaction Parsing
 TRANSACTION_PARSER_PROMPT = """
 Extract transaction details from this text accurately into a JSON format.
+If the text contains multiple transactions (e.g. lists, bullet points, numbered lists, or multiple separate items), detect all of them and return them as a list under the "transactions" key.
 Text: "{text}"
-Today is: {now_str}
+Today is: {now_str} (format YYYY-MM-DD HH:MM:SS)
 
 Focus on Indonesian context and currency (e.g., 'rb' means '000').
 
-Output MUST be a valid JSON with these fields:
-- amount: (number) The total amount.
-- date: (string, YYYY-MM-DD) Default to today ({now_str}).
-- merchant: (string)
-- description: (string)
-- category_suggestion: (string) Choose ONE from categories below.
-- currency: (string) Default 'IDR'.
-- type: (string) 'expense' or 'income'.
+Output MUST be a valid JSON with this format:
+{{
+  "transactions": [
+    {{
+      "amount": (number) The total amount.
+      "date": (string, YYYY-MM-DD HH:MM:SS) Default to current time ({now_str}).
+      "merchant": (string)
+      "description": (string)
+      "category_suggestion": (string) Choose ONE from categories below.
+      "currency": (string) Default 'IDR'.
+      "type": (string) 'expense' or 'income'.
+    }}
+  ]
+}}
 
 Categories & Definitions:
 - 'Wajib': Pembayaran hutang, cicilan, asuransi, pajak, biaya sekolah.
@@ -28,6 +35,13 @@ Categories & Definitions:
 Rules:
 1. For amounts like '50rb', '50k', parse as 50000.
 2. Return ONLY the JSON object.
+3. If the user input lists multiple items (e.g. using bullet points, numbers, or new lines), extract each item as a separate transaction in the "transactions" array.
+4. Calculate the transaction date & time relative to today ({now_str}). For example:
+   - "kemarin beli..." -> set date to yesterday's date, preserving current time or using the time if specified.
+   - "kemarin jam 7 malam..." -> set date-time to yesterday at 19:00:00.
+   - "tadi pagi jam 8..." -> set date-time to today at 08:00:00.
+   - "2 jam lalu..." -> subtract 2 hours from the current time.
+   - If no date/time is mentioned, default to current time ({now_str}).
 """
 
 # Prompt for Receipt/Image Parsing

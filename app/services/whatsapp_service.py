@@ -46,8 +46,8 @@ async def handle_message(text: str, phone: str):
             user_now = get_user_now(user)
 
             # 📊 SUMMARY
-            if text_lower == "summary":
-                return await handle_summary(user_id)
+            if text_lower in ("summary", "bulan ini", "bulan lalu"):
+                return await handle_monthly_summary(user, user_now, text_lower)
 
             # 📊 HARI INI
             if text_lower == "hari ini":
@@ -131,44 +131,121 @@ async def handle_transaction_input(text, user_id, user_now):
         # Menggunakan AI untuk parsing teks natural
         ai_data = await ai_service.parse_transaction_text(text, user_now)
         
-        amount = ai_data.get("amount")
-        description = ai_data.get("description") or text
-        category_suggestion = ai_data.get("category_suggestion")
-        trx_type = ai_data.get("type", "expense")
+        # Get list of transactions (support both list structure and single dict fallback)
+        transactions_list = []
+        if isinstance(ai_data, dict):
+            if "transactions" in ai_data and isinstance(ai_data["transactions"], list):
+                transactions_list = ai_data["transactions"]
+            elif ai_data.get("amount"):
+                transactions_list = [ai_data]
+        elif isinstance(ai_data, list):
+            transactions_list = ai_data
 
-        if not amount:
+        if not transactions_list:
             return "Maaf, saya tidak mengerti nominal transaksinya. Bisa diulang? (Contoh: kopi 15rb)"
 
         # Cari Account ID default user
         account = UserRepository.get_default_account(db, user_id)
         account_id = account.id if account else "00000000-0000-0000-0000-000000000000"
         
-        data = {
-            "account_id": account_id,
-            "amount": amount,
-            "type": trx_type,
-            "description": description,
-            "transaction_date": user_now,
-            "category_ids": []
-        }
-
-        # Konversi dict ke Pydantic model agar tidak error 'attribute'
-        transaction_data = TransactionCreate(**data)
-
-        trx = TransactionService.create_transaction(db, user_id, transaction_data)
-
-        msg = f"✅ Dicatat:\n📌 *{description}*\n💰 *Rp {amount:,.00f}*"
-        if category_suggestion:
-            msg += f"\n📁 Kategori: {category_suggestion}"
+        recorded_messages = []
+        for item in transactions_list:
+            amount = item.get("amount")
+            if not amount:
+                continue
             
-        return msg
+            description = item.get("description") or text
+            category_suggestion = item.get("category_suggestion")
+            trx_type = item.get("type", "expense")
 
-async def handle_summary(user_id):
+            # Check if there's a custom date/time parsed by the AI
+            item_date = user_now
+            if item.get("date"):
+                parsed_dt = None
+                for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+                    try:
+                        parsed_dt = datetime.strptime(item.get("date").strip(), fmt)
+                        break
+                    except ValueError:
+                        continue
+                if parsed_dt:
+                    item_date = parsed_dt.replace(tzinfo=user_now.tzinfo)
+            
+            data = {
+                "account_id": account_id,
+                "amount": amount,
+                "type": trx_type,
+                "description": description,
+                "transaction_date": item_date,
+                "category_ids": []
+            }
+
+            # Konversi dict ke Pydantic model agar tidak error 'attribute'
+            transaction_data = TransactionCreate(**data)
+            TransactionService.create_transaction(db, user_id, transaction_data)
+
+            msg = f"📌 *{description}*\n💰 *Rp {amount:,.00f}*"
+            if category_suggestion:
+                msg += f"\n📁 Kategori: {category_suggestion}"
+            recorded_messages.append(msg)
+
+        if not recorded_messages:
+            return "Maaf, saya tidak mengerti nominal transaksinya. Bisa diulang? (Contoh: kopi 15rb)"
+
+        if len(recorded_messages) == 1:
+            return f"✅ Dicatat:\n{recorded_messages[0]}"
+        else:
+            joined_list = "\n\n".join(recorded_messages)
+            return f"✅ Berhasil mencatat {len(recorded_messages)} transaksi:\n\n{joined_list}"
+
+async def handle_monthly_summary(user, user_now, command):
+    import calendar
+    import datetime as dt
+    user_id = user.id
+    tz_name = user.timezone or "Asia/Jakarta"
+    
+    month_ids = {
+        "January": "Januari", "February": "Februari", "March": "Maret", "April": "April",
+        "May": "Mei", "June": "Juni", "July": "Juli", "August": "Agustus",
+        "September": "September", "October": "Oktober", "November": "November", "December": "Desember"
+    }
+
+    def format_month_id(year, month):
+        temp_date = dt.date(year, month, 1)
+        eng_name = temp_date.strftime("%B")
+        ind_name = month_ids.get(eng_name, eng_name)
+        return f"{ind_name} {year}"
+
     with SessionLocal() as db:
-        summary = TransactionService.get_summary(db, user_id)
+        if command == "summary":
+            # All-time summary
+            summary = TransactionService.get_summary(db, user_id)
+            title = "📊 *Ringkasan Keuangan (Semua Waktu)*"
+        else:
+            if command == "bulan ini":
+                start_date = dt.date(user_now.year, user_now.month, 1)
+                _, last_day = calendar.monthrange(user_now.year, user_now.month)
+                end_date = dt.date(user_now.year, user_now.month, last_day)
+                month_label = format_month_id(user_now.year, user_now.month)
+                title = f"📊 *Ringkasan Keuangan Bulan Ini ({month_label})*"
+            else: # "bulan lalu"
+                if user_now.month == 1:
+                    last_month_year = user_now.year - 1
+                    last_month = 12
+                else:
+                    last_month_year = user_now.year
+                    last_month = user_now.month - 1
+                
+                start_date = dt.date(last_month_year, last_month, 1)
+                _, last_day = calendar.monthrange(last_month_year, last_month)
+                end_date = dt.date(last_month_year, last_month, last_day)
+                month_label = format_month_id(last_month_year, last_month)
+                title = f"📊 *Ringkasan Keuangan Bulan Lalu ({month_label})*"
+
+            summary = TransactionService.get_monthly_summary(db, user_id, start_date, end_date, tz_name)
 
         return (
-            f"📊 *Ringkasan Keuangan*:\n\n"
+            f"{title}:\n\n"
             f"📉 Pengeluaran: Rp {summary['total_expense']:,.00f}\n"
             f"📈 Pemasukan: Rp {summary['total_income']:,.00f}\n"
             f"💳 Saldo: *Rp {summary['balance']:,.00f}*"

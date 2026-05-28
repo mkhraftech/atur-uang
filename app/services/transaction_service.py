@@ -153,6 +153,36 @@ class TransactionService:
             "balance": float(total_income - total_expense)
         }
 
+    # 💰 MONTHLY SUMMARY
+    @staticmethod
+    def get_monthly_summary(db: Session, user_id, start_date, end_date, tz_name: str = "Asia/Jakarta"):
+        local_date = func.cast(
+            func.timezone(tz_name, func.timezone('UTC', Transaction.transaction_date)),
+            Date()
+        )
+        
+        total_expense = db.query(func.sum(Transaction.amount))\
+            .filter(
+                Transaction.user_id == user_id,
+                Transaction.type == "expense",
+                local_date >= start_date,
+                local_date <= end_date
+            ).scalar() or 0
+
+        total_income = db.query(func.sum(Transaction.amount))\
+            .filter(
+                Transaction.user_id == user_id,
+                Transaction.type == "income",
+                local_date >= start_date,
+                local_date <= end_date
+            ).scalar() or 0
+
+        return {
+            "total_expense": float(total_expense),
+            "total_income": float(total_income),
+            "balance": float(total_income - total_expense)
+        }
+
     # 📊 BY CATEGORY
     @staticmethod
     def get_by_category(db: Session, user_id):
